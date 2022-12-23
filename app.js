@@ -51,7 +51,7 @@
         }
 
         if (invalidFound) {
-            createToastAlert('Please fix any invalid inputs');
+            createToastAlert('Please fix any invalid inputs', 'danger');
             return;
         }
 
@@ -78,7 +78,7 @@
                 block: 'center',
                 inline: 'center'
             });
-            createToastAlert('Please fix any invalid inputs');
+            createToastAlert('Please fix any invalid inputs', 'danger');
             return;
         }
 
@@ -157,14 +157,18 @@
         $serverList.appendChild($option);
     };
 
-    const createToastAlert = message => {
+    const createToastAlert = (message, type='normal') => {
         let fragment = document.createDocumentFragment();
         let $alert = document.createElement('div');
         $alert.className = 'toast align-items-center text-bg-primary border-0 bottom-0 start-50 translate-middle-x position-fixed zindex-fixed';
+        if (type !== 'normal') {
+            $alert.classList.add(`bg-${type}`);
+        }
         $alert.setAttribute('role', 'alert');
         $alert.setAttribute('aria-live', 'assertive');
         $alert.setAttribute('aria-atomic', true);
         $alert.setAttribute('data-bs-delay', 2500);
+        $alert.style.zIndex = 1070;
 
         let $flex = document.createElement('div');
         $flex.className = 'd-flex';
@@ -206,7 +210,14 @@
             $input.setAttribute('type', 'text');
             $input.className = 'form-control';
             $input.setAttribute('id', key);
-            $input.value = server.streamServer[key];
+
+            if (key == 'auth' && server.streamServer.type == 'NodeMediaServer') {
+                let { username, password } = server.streamServer[key];
+                $input.value = `${username}:${password}`;
+                $input.title = 'Please format as: username:password';
+            } else {
+                $input.value = server.streamServer[key];
+            }
 
             subfragment.appendChild($label);
             subfragment.appendChild($input);
@@ -354,6 +365,12 @@
         let serverPriority = parseInt($modalServerPriority?.value) || 0;
         let serverEnabled = $modalServerEnabled?.checked == true;
 
+        let foundIndex = servers.findIndex(val => val.name == serverName);
+        if (foundIndex !== -1) {
+            createToastAlert(`A server named ${serverName} already exists!`, 'danger');
+            return;
+        }
+
         let serverInfo = Object.assign({}, serverTemplate, {
             name: serverName,
             priority: serverPriority,
@@ -363,6 +380,8 @@
 
         createServerEntry(serverInfo);
         createToastAlert(`Added ${streamServer.type} server as ${serverName}`);
+
+        $modalServer.querySelector('.btn-close').click();
     });
 
     $selectServer.addEventListener('click', _ => {
@@ -408,7 +427,7 @@
         if ($serverList.options.length == 0 || selectedIndex == -1) {
             ev.preventDefault();
             ev.stopPropagation();
-            createToastAlert('Error: Could not find any server configurations');
+            createToastAlert('Error: Could not find any server configurations', 'danger');
             return;
         }
 
@@ -511,6 +530,16 @@
             for (let inputElem of ingestInputs) {
                 let { id, value } = inputElem;
                 server.streamServer[id] = value;
+
+                if (id == 'auth' && editingServerType == 'NodeMediaServer') {
+                    let splitValue = value.split(':');
+                    if (splitValue.length !== 2) {
+                        createToastAlert('Error: Invalid username and password pair', 'danger');
+                        return;
+                    }
+                    let [ username, password ] = splitValue;
+                    server.streamServer[id] = { username, password };
+                }
             }
 
             let overrideEnabled = $page1.querySelector('#enable-override').checked;
@@ -536,28 +565,29 @@
                     let [ serverName, serverType ] = selectedOption.innerText.split(' (');
                     serverType = serverType?.slice(0,-1);
 
-                    let serverIndex = servers.findIndex(val => val.name == editingServerName && val.streamServer.type == editingServerType);
+                    let normalSceneBackup = $page2.querySelector('#backup-normal').value;
+                    let lowSceneBackup = $page2.querySelector('#backup-low').value;
+                    let offlineSceneBackup = $page2.querySelector('#backup-offline').value;
 
-                    if (serverIndex !== -1) {
-                        let normalSceneBackup = $page2.querySelector('#backup-normal').value;
-                        let lowSceneBackup = $page2.querySelector('#backup-low').value;
-                        let offlineSceneBackup = $page2.querySelector('#backup-offline').value;
-
-                        if (normalSceneBackup !== '' || lowSceneBackup !== '' || offlineSceneBackup !== '') {
-                            server.dependsOn = {
-                                name: serverName,
-                                backupScenes: {
-                                    normal: normalSceneBackup,
-                                    low: lowSceneBackup,
-                                    offline: offlineSceneBackup
-                                }
-                            };
-                        }
-
-                        servers[serverIndex] = server;
+                    if (normalSceneBackup !== '' || lowSceneBackup !== '' || offlineSceneBackup !== '') {
+                        server.dependsOn = {
+                            name: serverName,
+                            backupScenes: {
+                                normal: normalSceneBackup,
+                                low: lowSceneBackup,
+                                offline: offlineSceneBackup
+                            }
+                        };
                     }
                 }
             }
+
+            let serverIndex = servers.findIndex(val => val.name == editingServerName && val.streamServer.type == editingServerType);
+            if (serverIndex !== -1) {
+                servers[serverIndex] = server;
+            }
+
+            $modalServerConfig.querySelector('.btn-close').click();
         };
     });
 
