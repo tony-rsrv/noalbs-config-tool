@@ -2,8 +2,8 @@
     const serverSchemas = JSON.parse('[{"type":"Belabox","statsUrl":"http://belabox-stats-url/yourkey","publisher":"yourkey"},{"type":"Nginx","statsUrl":"http://localhost/stats","application":"publish","key":"live"},{"type":"Nimble","statsUrl":"http://nimble:8082","id":"0.0.0.0:1234","application":"live","key":"srt"},{"type":"NodeMediaServer","statsUrl":"http://localhost:8000/api/streams","application":"publish","key":"live","auth":{"username":"admin","password":"admin"}},{"type":"Obs","source":"Media/VLC Source"},{"type":"SrtLiveServer","statsUrl":"http://localhost:8181/stats","publisher":"publish/live/feed1"}]');
     const serverTemplate = JSON.parse('{"name":"default","priority":0,"overrideScenes":null,"dependsOn":null,"enabled":true}');
 
-    const validCommands = JSON.parse('[{"name":"Start","description":"On-demand command to start streaming in OBS.","example":"!start","role":"Admin"},{"name":"Stop","description":"On-demand command to stop streaming in OBS.","example":"!stop","role":"Admin"},{"name":"Record","description":"On-demand command to toggle recording in OBS.","example":"!record","role":"Admin"},{"name":"Switch","description":"Switches to the provided scene (fuzzy match).","example":"!switch INTRO","role":"Admin"},{"name":"Source","description":"Toggles an OBS source items visibility on the current scene.","example":"!source media","role":"Admin"},{"name":"Live","description":"Switch to the live scene.","example":"!live","role":"Admin"},{"name":"Privacy","description":"Switch to the privacy scene","example":"!privacy","role":"Admin"},{"name":"Starting","description":"Switch to the starting scene","example":"!starting","role":"Admin"},{"name":"Ending","description":"Switch to the ending scene.","example":"!ending","role":"Admin"},{"name":"Trigger","description":"Changes the low bitrate threshold to the defined value.","example":"!trigger 800","role":"Mod"},{"name":"Otrigger","description":"Changes the offline bitrate threshold to the defined value.","example":"!otrigger 200","role":"Mod"},{"name":"Rtrigger","description":"Changes the RTT threshold to the defined value.","example":"!rtrigger 2000","role":"Mod"},{"name":"Ortrigger","description":"Changes the RTT based offline bitrate threshold to the defined value.","example":"!ortrigger 3000","role":"Mod"},{"name":"Sourceinfo","description":"Gives you details about the SOURCE in chat.","example":"!sourceinfo","role":"Mod"},{"name":"Serverinfo","description":"Gives you details about the SERVER in chat.","example":"!serverinfo","role":"Mod"},{"name":"Fix","description":"Tries to fix the stream.","example":"!fix","role":"Mod"},{"name":"Refresh","description":"Tries to fix the stream.","example":"!refresh","role":"Mod"},{"name":"Bitrate","description":"Gives you the current bitrate in chat.","example":"!bitrate","role":"Public"}]');
-    var aliases = JSON.parse('[{"name":"Fix","permission":"Mod","alias":["f"]},{"name":"Switch","permission":"Mod","alias":["ss"]},{"name":"Bitrate","permission":null,"alias":["b"]},{"name":"Privacy","permission":"Admin","alias":["brb"]}]');
+    const validCommands = JSON.parse('[{"name":"Start","description":"On-demand command to start streaming in OBS.","example":"!start","role":"Admin"},{"name":"Stop","description":"On-demand command to stop streaming in OBS.","example":"!stop","role":"Admin"},{"name":"Rec","description":"On-demand command to toggle recording in OBS.","example":"!record","role":"Admin"},{"name":"Switch","description":"Switches to the provided scene (fuzzy match).","example":"!switch INTRO","role":"Admin"},{"name":"Source","description":"Toggles an OBS source items visibility on the current scene.","example":"!source media","role":"Admin"},{"name":"LiveScene","description":"Switch to the live scene.","example":"!live","role":"Admin"},{"name":"PrivacyScene","description":"Switch to the privacy scene","example":"!privacy","role":"Admin"},{"name":"StartingScene","description":"Switch to the starting scene","example":"!starting","role":"Admin"},{"name":"EndingScene","description":"Switch to the ending scene.","example":"!ending","role":"Admin"},{"name":"Trigger","description":"Changes the low bitrate threshold to the defined value.","example":"!trigger 800","role":"Mod"},{"name":"Otrigger","description":"Changes the offline bitrate threshold to the defined value.","example":"!otrigger 200","role":"Mod"},{"name":"Rtrigger","description":"Changes the RTT threshold to the defined value.","example":"!rtrigger 2000","role":"Mod"},{"name":"Ortrigger","description":"Changes the RTT based offline bitrate threshold to the defined value.","example":"!ortrigger 3000","role":"Mod"},{"name":"Sourceinfo","description":"Gives you details about the SOURCE in chat.","example":"!sourceinfo","role":"Mod"},{"name":"ServerInfo","description":"Gives you details about the SERVER in chat.","example":"!serverinfo","role":"Mod"},{"name":"Fix","description":"Tries to fix the stream.","example":"!fix","role":"Mod"},{"name":"Refresh","description":"Tries to fix the stream.","example":"!refresh","role":"Mod"},{"name":"Bitrate","description":"Gives you the current bitrate in chat.","example":"!bitrate","role":"Public"}]');
+    var aliases = JSON.parse('[{"name":"Fix","permission":"Mod","alias":["f"]},{"name":"Switch","permission":"Mod","alias":["ss"]},{"name":"Bitrate","permission":null,"alias":["b"]},{"name":"PrivacyScene","permission":"Admin","alias":["brb"]}]');
     var defaultAliases = Array.from(aliases);
     const permissionRoles = {
         Admin: 'Admin',
@@ -27,6 +27,25 @@
     const $modalSubmitAlias = $modalCommands.querySelector('#submit-alias');
 
     const $modalServerConfig = document.querySelector('#serverConfigModal');
+    
+    const $command = document.querySelector('#command');
+
+    function populateCommandList() {
+        var commandFragment = document.createDocumentFragment();
+
+        for (let index in validCommands) {
+            let cmd = validCommands[index];
+
+            let $option = document.createElement('option');
+            $option.setAttribute('value', index);
+            $option.setAttribute('data-name', cmd.name);
+            $option.innerText = cmd.name;
+
+            commandFragment.appendChild($option);
+        }
+
+        $command.appendChild(commandFragment);
+    }
 
     function download(content, fileName, contentType) {
         const a = document.createElement("a");
@@ -89,6 +108,9 @@
             adminsArr = adminsArr[0] !== '' ? adminsArr : [];
         }
 
+        let commands = {};
+        aliases.forEach(({name,...rest}) => commands[name] = {...rest})
+
         noalbsConfig.user = {
             id: null,
             name: document.querySelector('#chatUsername').value,
@@ -126,7 +148,7 @@
             enablePublicCommands: document.querySelector('#chatEnablePublicCommands').checked,
             enableModCommands: document.querySelector('#chatEnableModCommands').checked,
             enableAutoStopStreamOnHostOrRaid: document.querySelector('#chatEnableAutoStopStreamOnHostOrRaid').checked,
-            commands: aliases
+            commands
         };
         noalbsConfig.optionalScenes = {
             starting: document.querySelector('#optionalScenesStarting').value || null,
@@ -636,7 +658,11 @@
             };
 
             let existingAliasIndex = Object.values(aliases).findIndex(a => a.name == name);
-            aliases[existingAliasIndex] = newAlias;
+            if (existingAliasIndex == -1) {
+                aliases.push(newAlias);
+            } else {
+                aliases[existingAliasIndex] = newAlias;
+            }
         };
     });
 
@@ -667,4 +693,6 @@
             target.classList.add('active');
         });
     }
+
+    populateCommandList();
 })();
